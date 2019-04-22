@@ -1,0 +1,6 @@
+---
+nitro_user: nsroot
+nitro_pass: nsroot
+bkp_user: "abox"
+bkp_server: "10.25.103.190"
+bkp_path: "/home/abox/ns_backup/"

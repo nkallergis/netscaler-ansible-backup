@@ -1,0 +1,127 @@
+---
+- name: Play with time
+  hosts: netscalers
+  connection: local
+  vars:
+    bkp_files_min: 2
+    bkp_filesize_min: 200
+
+  tasks:
+##### SAVE RUNNING CONFIGURATION
+    - name: Save running configuration
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/nsconfig?action=save"
+        method: POST
+        status_code: 200
+        headers:
+          X-NITRO-USER: "{{nitro_user}}"
+          X-NITRO-PASS: "{{nitro_pass}}"
+        body_format: json
+        body:
+          nsconfig: {}
+
+
+##### CREATE BACKUP FILENAME FROM DATE OF LOCALHOST
+    - name: Get time from localhost
+      connection: local
+      run_once: True
+      remote_user: kallergisn
+      setup:
+
+    - name: Construct backup filename - step 1
+      set_fact:
+        bkp_date: "{{ansible_facts.date_time.year}}{{ansible_facts.date_time.month}}{{ansible_facts.date_time.day}}"
+        bkp_time: "{{ansible_facts.date_time.hour}}{{ansible_facts.date_time.minute}}{{ansible_facts.date_time.second}}"
+    
+    - name: Construct backup filename - step 2
+      set_fact:
+        bkp_filename: "{{bkp_date}}_{{bkp_time}}_{{inventory_hostname}}_full.auto"
+
+
+##### CREATE & CHECK BACKUP
+    - name: Create backup
+      ignore_errors: true
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/systembackup?action=create"
+        method: POST
+        status_code: 200
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"
+        body_format: json
+        body:
+          systembackup:
+            filename: "{{bkp_filename}}"
+            level: "full"
+
+    - name: Check that backup file exists
+      register: result
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/systembackup/{{bkp_filename}}.tgz"
+        method: GET
+        status_code: 200
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"
+
+    - name: Get backup file size
+      set_fact:
+        bkp_filesize: "{{result.json.systembackup[0].size}}"
+        
+    - name: Check that backup file size is ok (>{{bkp_filesize_min}}KB)
+      assert:
+        that: "{{bkp_filesize}} > {{bkp_filesize_min}}"
+
+    - name: Copy backup file to SCP server
+      connection: ssh_citrix_adc
+      remote_user: nsroot
+      vars:
+        ansible_python_interpreter: /var/python/bin/python
+        priv_key: "/flash/nsconfig/ssh/ssh_host_rsa_key"
+        bkp_src: "/var/ns_sys_backup/{{bkp_filename}}.tgz"
+      shell: "scp -i {{priv_key}} {{bkp_src}} {{bkp_user}}@{{bkp_server}}:{{bkp_path}}"
+
+    - name: Check copied filesize
+      register: result
+      delegate_to: "{{bkp_server}}"
+      run_once: True
+      remote_user: "{{bkp_user}}"
+      stat:
+        path: "{{bkp_path}}/{{bkp_filename}}.tgz"
+    
+    - name: Check that copied file size is ok (={{bkp_filesize}}KB)
+      assert:
+        that: "{{(result.stat.size / 1024) | round}} == {{bkp_filesize}}"
+
+
+##### DELETE OLD BACKUP FILES
+    - name: Get list of existing backup files
+      register: result
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/systembackup/"
+        method: GET
+        status_code: 200
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"
+
+    - name: Count existing backup files
+      set_fact:
+        bkp_files: "{{result.json.systembackup | length}}"
+
+    - name: Delete old backup files (only automatically generated which end in '.auto.tgz')
+      loop: "{{range(0,(bkp_files|int) - (bkp_files_min|int)) | list}}"
+      when:
+        - (bkp_files|int) > (bkp_files_min|int)
+        - result.json.systembackup[item].filename is search(".auto.tgz")
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/systembackup/{{result.json.systembackup[item].filename}}"
+        method: DELETE
+        status_code: 200
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"

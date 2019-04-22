@@ -1,0 +1,7 @@
+---
+all:
+  children:
+    netscalers:
+      hosts:
+        nspri:
+          ansible_host: 10.25.103.111
