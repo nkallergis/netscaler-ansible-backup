@@ -2,9 +2,6 @@
 - name: Play with time
   hosts: netscalers
   connection: local
-  vars:
-    bkp_files_max: 5
-    bkp_filesize_min: 200
 
   tasks:
 ##### SAVE RUNNING CONFIGURATION

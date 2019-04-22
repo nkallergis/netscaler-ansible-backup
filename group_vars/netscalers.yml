@@ -1,6 +1,9 @@
 ---
 nitro_user: "nsroot"
 nitro_pass: "nsroot"
+
 bkp_user: "nsroot"
 bkp_server: "10.25.103.190"
 bkp_path: "/home/nsroot/ns_backup/"
+bkp_files_max: 5
+bkp_filesize_min: 200
