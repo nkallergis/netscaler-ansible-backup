@@ -3,7 +3,7 @@
   hosts: netscalers
   connection: local
   vars:
-    bkp_files_min: 2
+    bkp_files_max: 5
     bkp_filesize_min: 200
 
   tasks:
@@ -113,9 +113,9 @@
         bkp_files: "{{result.json.systembackup | length}}"
 
     - name: Delete old backup files (only automatically generated which end in '.auto.tgz')
-      loop: "{{range(0,(bkp_files|int) - (bkp_files_min|int)) | list}}"
+      loop: "{{range(0,(bkp_files|int) - (bkp_files_max|int)) | list}}"
       when:
-        - (bkp_files|int) > (bkp_files_min|int)
+        - (bkp_files|int) > (bkp_files_max|int)
         - result.json.systembackup[item].filename is search(".auto.tgz")
       uri:
         url: "http://{{ansible_host}}/nitro/v1/config/systembackup/{{result.json.systembackup[item].filename}}"
