@@ -1,0 +1,52 @@
+---
+- name: Migrate NetScaler WAF configuration
+  hosts: netscalers
+  connection: local
+
+  tasks:
+##### CONSTRUCT ARCHIVE FILENAME FROM DATE OF LOCALHOST
+    - name: Get time from localhost
+      connection: local
+      run_once: True
+      setup:
+
+    - name: Construct archive filename - step 1
+      set_fact:
+        bkp_date: "{{ansible_facts.date_time.year}}{{ansible_facts.date_time.month}}{{ansible_facts.date_time.day}}"
+        bkp_time: "{{ansible_facts.date_time.hour}}{{ansible_facts.date_time.minute}}{{ansible_facts.date_time.second}}"
+    
+    - name: Construct backup filename - step 2
+      set_fact:
+        # bkp_filename: "{{bkp_date}}_{{bkp_time}}_{{inventory_hostname}}_appfw.auto"
+        bkp_filename: "{{inventory_hostname}}_appfw.auto"
+
+
+    - name: Archive appfw
+      register: result
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/appfwarchive?action=export"
+        method: POST
+        status_code: 200
+        headers:
+          X-NITRO-USER: "{{ns.user}}"
+          X-NITRO-PASS: "{{ns.pass}}"
+        body_format: json
+        body:
+          appfwarchive:
+            name: "{{bkp_filename}}"
+            target: "{{bkp.ns_path}}"
+
+    - name: Copy archive file from NS to SCP server
+      connection: ssh_citrix_adc
+      remote_user: "{{ns.user}}"
+      vars:
+        ansible_python_interpreter: /var/python/bin/python
+      shell: "scp -i {{ns.privkey_path}} {{bkp.ns_path}}/{{bkp_filename}}.tgz {{bkp.user}}@{{bkp.server}}:{{bkp.server_path}}"
+
+    - name: Check that archive exists on SCP server
+      delegate_to: "{{bkp.server}}"
+      run_once: True
+      remote_user: "{{bkp.user}}"
+      stat:
+        path: "{{bkp.server_path}}/{{bkp_filename}}.tgz"
+    

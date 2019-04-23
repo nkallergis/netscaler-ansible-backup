@@ -24,16 +24,16 @@
       set_fact:
         bkp_filesize_original: "{{(result.stat.size / 1024) | round}}"
         
-    - name: Check that backup filesize on SCP server is ok (>{{bkp_filesize_min}}KB)
+    - name: Check that backup filesize on SCP server is ok (>{{bkp.filesize_min}}KB)
       assert:
-        that: "{{bkp_filesize_original}} > {{bkp_filesize_min}}"
+        that: "{{bkp_filesize_original}} > {{bkp.filesize_min}}"
     
     - name: Copy backup file from SCP server to NS
       connection: ssh_citrix_adc
-      remote_user: "{{nitro_user}}"
+      remote_user: "{{ns.user}}"
       vars:
         ansible_python_interpreter: /var/python/bin/python
-      shell: "scp -i {{ns_priv_key}} {{bkp_user}}@{{bkp_server}}:{{bkp_server_path}}/{{bkp_filename}} {{bkp_ns_path}}"
+      shell: "scp -i {{ns.privkey_path}} {{bkp_user}}@{{bkp_server}}:{{bkp_server_path}}/{{bkp_filename}} {{bkp_ns_path}}"
 
 
 ##### ADD, CHECK & RESTORE BACKUP
@@ -44,8 +44,8 @@
         status_code: 201
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
         body_format: json
         body:
           systembackup:
@@ -59,8 +59,8 @@
         status_code: 200
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
 
     - name: Get backup filesize on NS
       set_fact:
@@ -77,8 +77,8 @@
         status_code: 200
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
         body_format: json
         body:
           systembackup:
@@ -93,8 +93,8 @@
         status_code: 201
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
         body_format: json
         body:
           reboot:

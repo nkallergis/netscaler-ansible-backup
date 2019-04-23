@@ -11,8 +11,8 @@
         method: POST
         status_code: 200
         headers:
-          X-NITRO-USER: "{{nitro_user}}"
-          X-NITRO-PASS: "{{nitro_pass}}"
+          X-NITRO-USER: "{{ns.user}}"
+          X-NITRO-PASS: "{{ns.pass}}"
         body_format: json
         body:
           nsconfig: {}
@@ -42,8 +42,8 @@
         status_code: 200
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
         body_format: json
         body:
           systembackup:
@@ -58,31 +58,31 @@
         status_code: 200
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
 
     - name: Get backup file size on NS
       set_fact:
         bkp_filesize: "{{result.json.systembackup[0].size}}"
         
-    - name: Check that backup file size is ok (>{{bkp_filesize_min}}KB)
+    - name: Check that backup file size is ok (>{{bkp.filesize_min}}KB)
       assert:
-        that: "{{bkp_filesize}} > {{bkp_filesize_min}}"
+        that: "{{bkp_filesize}} > {{bkp.filesize_min}}"
 
     - name: Copy backup file from NS to SCP server
       connection: ssh_citrix_adc
-      remote_user: "{{nitro_user}}"
+      remote_user: "{{ns.user}}"
       vars:
         ansible_python_interpreter: /var/python/bin/python
-      shell: "scp -i {{ns_priv_key}} {{bkp_ns_path}}/{{bkp_filename}}.tgz {{bkp_user}}@{{bkp_server}}:{{bkp_server_path}}"
+      shell: "scp -i {{ns.privkey_path}} {{bkp.ns_path}}/{{bkp_filename}}.tgz {{bkp.user}}@{{bkp.server}}:{{bkp.server_path}}"
 
     - name: Check copied filesize on SCP server
       register: result
-      delegate_to: "{{bkp_server}}"
+      delegate_to: "{{bkp.server}}"
       run_once: True
-      remote_user: "{{bkp_user}}"
+      remote_user: "{{bkp.user}}"
       stat:
-        path: "{{bkp_server_path}}/{{bkp_filename}}.tgz"
+        path: "{{bkp.server_path}}/{{bkp_filename}}.tgz"
     
     - name: Check that copied file size is ok (={{bkp_filesize}}KB)
       assert:
@@ -98,17 +98,17 @@
         status_code: 200
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
 
     - name: Count existing backup files
       set_fact:
         bkp_files: "{{result.json.systembackup | length}}"
 
     - name: Delete old backup files (only automatically generated which end in '.auto.tgz')
-      loop: "{{range(0,(bkp_files|int) - (bkp_files_max|int)) | list}}"
+      loop: "{{range(0,(bkp_files|int) - (bkp.files_max|int)) | list}}"
       when:
-        - (bkp_files|int) > (bkp_files_max|int)
+        - (bkp_files|int) > (bkp.files_max|int)
         - result.json.systembackup[item].filename is search(".auto.tgz")
       uri:
         url: "http://{{ansible_host}}/nitro/v1/config/systembackup/{{result.json.systembackup[item].filename}}"
@@ -116,5 +116,5 @@
         status_code: 200
         return_content: yes
         headers:
-          X-NITRO-USER: "{{ nitro_user }}"
-          X-NITRO-PASS: "{{ nitro_pass }}"
+          X-NITRO-USER: "{{ ns.user }}"
+          X-NITRO-PASS: "{{ ns.pass }}"
