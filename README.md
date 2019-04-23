@@ -3,6 +3,8 @@
 
 Most tasks are run through REST API (ansible's _uri_ module). Exporting/importing the file is done via _ssh_citrix_adc_ because no similar API functionality exists currently.
 
+**NOTE:** It is assumed that proper SSH key authentication is working between nodes.
+
 # Usage
 ## Backup
 ```ansible-playbook -i <inventory_filename> backup.yml```
