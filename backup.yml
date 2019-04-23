@@ -18,7 +18,7 @@
           nsconfig: {}
 
 
-##### CREATE BACKUP FILENAME FROM DATE OF LOCALHOST
+##### CONSTRUCT BACKUP FILENAME FROM DATE OF LOCALHOST
     - name: Get time from localhost
       connection: local
       run_once: True
@@ -50,7 +50,7 @@
             filename: "{{bkp_filename}}"
             level: "full"
 
-    - name: Check that backup file exists
+    - name: Check that backup file exists on NS
       register: result
       uri:
         url: "http://{{ansible_host}}/nitro/v1/config/systembackup/{{bkp_filename}}.tgz"
@@ -61,7 +61,7 @@
           X-NITRO-USER: "{{ nitro_user }}"
           X-NITRO-PASS: "{{ nitro_pass }}"
 
-    - name: Get backup file size
+    - name: Get backup file size on NS
       set_fact:
         bkp_filesize: "{{result.json.systembackup[0].size}}"
         
@@ -69,14 +69,14 @@
       assert:
         that: "{{bkp_filesize}} > {{bkp_filesize_min}}"
 
-    - name: Copy backup file to SCP server
+    - name: Copy backup file from NS to SCP server
       connection: ssh_citrix_adc
       remote_user: "{{nitro_user}}"
       vars:
         ansible_python_interpreter: /var/python/bin/python
       shell: "scp -i {{ns_priv_key}} {{bkp_ns_path}}/{{bkp_filename}}.tgz {{bkp_user}}@{{bkp_server}}:{{bkp_server_path}}"
 
-    - name: Check copied filesize
+    - name: Check copied filesize on SCP server
       register: result
       delegate_to: "{{bkp_server}}"
       run_once: True

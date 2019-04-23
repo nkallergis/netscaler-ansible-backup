@@ -12,7 +12,7 @@
 
   tasks:
 ##### IMPORT, ADD & RESTORE BACKUP
-    - name: Check original filesize
+    - name: Check backup filesize on SCP server
       register: result
       delegate_to: "{{bkp_server}}"
       run_once: True
@@ -20,15 +20,15 @@
       stat:
         path: "{{bkp_server_path}}/{{bkp_filename}}"
     
-    - name: Get original backup file size
+    - name: Get backup filesize on SCP server
       set_fact:
         bkp_filesize_original: "{{(result.stat.size / 1024) | round}}"
         
-    - name: Check that original backup file size is ok (>{{bkp_filesize_min}}KB)
+    - name: Check that backup filesize on SCP server is ok (>{{bkp_filesize_min}}KB)
       assert:
         that: "{{bkp_filesize_original}} > {{bkp_filesize_min}}"
     
-    - name: Copy backup file from SCP server
+    - name: Copy backup file from SCP server to NS
       connection: ssh_citrix_adc
       remote_user: "{{nitro_user}}"
       vars:
@@ -51,7 +51,7 @@
           systembackup:
             filename: "{{bkp_filename}}"
 
-    - name: Check that backup exists in the repository
+    - name: Check that backup exists in the NS repository
       register: result
       uri:
         url: "http://{{ansible_host}}/nitro/v1/config/systembackup/{{bkp_filename}}"
@@ -62,7 +62,7 @@
           X-NITRO-USER: "{{ nitro_user }}"
           X-NITRO-PASS: "{{ nitro_pass }}"
 
-    - name: Get copied backup file size
+    - name: Get backup filesize on NS
       set_fact:
         bkp_filesize: "{{result.json.systembackup[0].size}}"
         
@@ -70,7 +70,7 @@
       assert:
         that: "{{bkp_filesize}} == {{bkp_filesize_original}}"
 
-    - name: Restore backup
+    - name: Restore backup from the NS repository
       uri:
         url: "http://{{ansible_host}}/nitro/v1/config/systembackup?action=restore"
         method: POST
