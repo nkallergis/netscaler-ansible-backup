@@ -1,4 +1,11 @@
 ---
+
+# Use with --extra-vars:
+# ansible-playbook -i <inventory_filename> restore.yml -e "bkp_filename=<bkp_filename> ns_target=<ns_target>"
+# where:
+# <bkp_filename> is the filename of the backup file to restore as it exists in the SCP server
+# <ns_target> is the hostname of the target NetScaler node as it exists in the inventory
+
 - name: Restore NetScaler configuration
   hosts: "{{ns_target}}"
   connection: local
