@@ -1,0 +1,94 @@
+---
+- name: Restore NetScaler configuration
+  hosts: "{{ns_target}}"
+  connection: local
+
+  tasks:
+##### IMPORT, ADD & RESTORE BACKUP
+    - name: Check original filesize
+      register: result
+      delegate_to: "{{bkp_server}}"
+      run_once: True
+      remote_user: "{{bkp_user}}"
+      stat:
+        path: "{{bkp_server_path}}/{{bkp_filename}}"
+    
+    - name: Get original backup file size
+      set_fact:
+        bkp_filesize_original: "{{(result.stat.size / 1024) | round}}"
+        
+    - name: Check that original backup file size is ok (>{{bkp_filesize_min}}KB)
+      assert:
+        that: "{{bkp_filesize_original}} > {{bkp_filesize_min}}"
+    
+    - name: Copy backup file from SCP server
+      connection: ssh_citrix_adc
+      remote_user: "{{nitro_user}}"
+      vars:
+        ansible_python_interpreter: /var/python/bin/python
+      shell: "scp -i {{ns_priv_key}} {{bkp_user}}@{{bkp_server}}:{{bkp_server_path}}/{{bkp_filename}} {{bkp_ns_path}}"
+
+
+##### ADD, CHECK & RESTORE BACKUP
+    - name: Add backup file to NS repository
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/systembackup/"
+        method: POST
+        status_code: 201
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"
+        body_format: json
+        body:
+          systembackup:
+            filename: "{{bkp_filename}}"
+
+    - name: Check that backup exists in the repository
+      register: result
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/systembackup/{{bkp_filename}}"
+        method: GET
+        status_code: 200
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"
+
+    - name: Get copied backup file size
+      set_fact:
+        bkp_filesize: "{{result.json.systembackup[0].size}}"
+        
+    - name: Check that copied backup file size is ok (={{bkp_filesize_original}}KB)
+      assert:
+        that: "{{bkp_filesize}} == {{bkp_filesize_original}}"
+
+    - name: Restore backup
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/systembackup?action=restore"
+        method: POST
+        status_code: 200
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"
+        body_format: json
+        body:
+          systembackup:
+            filename: "{{bkp_filename}}"
+
+
+##### RELOAD NETSCALER
+    - name: Reboot NetScaler
+      uri:
+        url: "http://{{ansible_host}}/nitro/v1/config/reboot"
+        method: POST
+        status_code: 201
+        return_content: yes
+        headers:
+          X-NITRO-USER: "{{ nitro_user }}"
+          X-NITRO-PASS: "{{ nitro_pass }}"
+        body_format: json
+        body:
+          reboot:
+            warm: False

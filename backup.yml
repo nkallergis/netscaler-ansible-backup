@@ -1,5 +1,5 @@
 ---
-- name: Play with time
+- name: Backup NetScaler configuration
   hosts: netscalers
   connection: local
 
@@ -22,7 +22,6 @@
     - name: Get time from localhost
       connection: local
       run_once: True
-      remote_user: kallergisn
       setup:
 
     - name: Construct backup filename - step 1
@@ -37,7 +36,6 @@
 
 ##### CREATE & CHECK BACKUP
     - name: Create backup
-      ignore_errors: true
       uri:
         url: "http://{{ansible_host}}/nitro/v1/config/systembackup?action=create"
         method: POST
@@ -73,12 +71,10 @@
 
     - name: Copy backup file to SCP server
       connection: ssh_citrix_adc
-      remote_user: nsroot
+      remote_user: "{{nitro_user}}"
       vars:
         ansible_python_interpreter: /var/python/bin/python
-        priv_key: "/flash/nsconfig/ssh/ssh_host_rsa_key"
-        bkp_src: "/var/ns_sys_backup/{{bkp_filename}}.tgz"
-      shell: "scp -i {{priv_key}} {{bkp_src}} {{bkp_user}}@{{bkp_server}}:{{bkp_path}}"
+      shell: "scp -i {{ns_priv_key}} {{bkp_ns_path}}/{{bkp_filename}}.tgz {{bkp_user}}@{{bkp_server}}:{{bkp_server_path}}"
 
     - name: Check copied filesize
       register: result
@@ -86,7 +82,7 @@
       run_once: True
       remote_user: "{{bkp_user}}"
       stat:
-        path: "{{bkp_path}}/{{bkp_filename}}.tgz"
+        path: "{{bkp_server_path}}/{{bkp_filename}}.tgz"
     
     - name: Check that copied file size is ok (={{bkp_filesize}}KB)
       assert:
